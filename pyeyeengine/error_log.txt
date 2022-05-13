@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "pyeyeengine/server/request_distributor.py", line 229, in pyeyeengine.server.request_distributor.RequestDistributor._try_serving
+  File "pyeyeengine/server/request_distributor.py", line 680, in pyeyeengine.server.request_distributor.RequestDistributor.set_table_mask
+  File "pyeyeengine/calibration/ORB_single_image/ORB_single_image_calibration.py", line 42, in pyeyeengine.calibration.ORB_single_image.ORB_single_image_calibration.SingleImageCalibrator.__init__
+TypeError: __init__() takes at least 2 positional arguments (1 given)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "pyeyeengine/server/request_distributor.py", line 195, in pyeyeengine.server.request_distributor.RequestDistributor.distribute
+  File "pyeyeengine/server/request_distributor.py", line 231, in pyeyeengine.server.request_distributor.RequestDistributor._try_serving
+pyeyeengine.server.request_distributor.ClientServerException: Error in set_table_mask

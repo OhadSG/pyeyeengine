@@ -1,0 +1,105 @@
+import numpy as np
+import cv2
+from primesense import openni2  # , nite2
+from primesense import _openni2 as c_api
+from primesense.openni2 import IMAGE_REGISTRATION_DEPTH_TO_COLOR
+
+# use :
+# cam = CameraReader()
+# rgb = cam.get_rgb()
+# depth = cam.get_depth()
+# depth_for_display = cam.dmap_2_d4d(depth)
+
+class CameraReader:
+    def __init__(self, display=False, register=True, resxy=[320,240], mirroring=False):
+        self.display = display
+        self.resxy = resxy
+
+        ## Path of the OpenNI redistribution OpenNI2.so or OpenNI2.dll
+        distribution = './OpenNI2/Redist'
+
+        ## Initialize openni and check
+        openni2.initialize(distribution)  #
+        # if (openni2.is_initialized()):
+        #     print("openNI2 initialized")
+        # else:
+        #     print("openNI2 not initialized")
+
+        ## Register the device
+        self.device = openni2.Device.open_any()
+
+        ## Create the streams
+        self.depth_stream = self.device.create_depth_stream()
+        self.rgb_stream = self.device.create_color_stream()
+
+        ## Configure the depth_stream -- changes automatically based on bus speed
+        # print 'Get b4 video mode', depth_stream.get_video_mode() # Checks depth video configuration
+        self.depth_stream.set_video_mode(
+            c_api.OniVideoMode(pixelFormat=c_api.OniPixelFormat.ONI_PIXEL_FORMAT_DEPTH_1_MM, resolutionX=self.resxy[0],
+                               resolutionY=self.resxy[1],
+                               fps=30))
+
+        ## Check and configure the mirroring -- default is True
+        # print 'Mirroring info1', depth_stream.get_mirroring_enabled()
+        self.depth_stream.set_mirroring_enabled(mirroring)
+        self.rgb_stream.set_mirroring_enabled(mirroring)
+
+        ## Start the streams
+        self.rgb_stream.start()
+        self.depth_stream.start()
+
+        ## Use 'help' to get more info
+        # help(dev.set_image_registration_mode)
+        if register == True:
+            self.device.set_image_registration_mode(IMAGE_REGISTRATION_DEPTH_TO_COLOR)
+
+    def get_rgb(self, mask=1):
+        bgr = np.fromstring(self.rgb_stream.read_frame().get_buffer_as_uint8(), dtype=np.uint8).reshape(
+            240, 320, 3)
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)*mask
+        if self.display:
+            cv2.imshow("cam rgb", rgb)
+        return rgb
+
+
+
+    def get_depth(self):
+        """
+        Returns numpy ndarrays representing the raw and ranged depth images.
+        Outputs:
+            dmap:= distancemap in mm, 1L ndarray, dtype=uint16, min=0, max=2**12-1 ( in mm from cam )
+        Note1:
+            fromstring is faster than asarray or frombuffer
+        Note2:
+            .reshape(120,160) #smaller image for faster response
+                    OMAP/ARM default video configuration
+            .reshape(240,320) # Used to MATCH RGB Image (OMAP/ARM)
+                    Requires .set_video_mode
+        """
+        depth = np.fromstring(self.depth_stream.read_frame().get_buffer_as_uint16(),
+                              dtype=np.uint16).reshape(self.resxy[1], self.resxy[0])
+        if self.display:
+            cv2.imshow("cam depth", self.dmap_2_d4d(depth))
+        return depth
+
+    def depth_1d(self, dmap):
+        return np.uint8(dmap.astype(float) * 255 / 2 ** 12 - 1)  # Correct the range. Depth images are 12bits
+
+    def dmap_2_d4d(self, dmap):  # prepare for display
+        dmap_1d = self.depth_1d(dmap)  # Correct the range. Depth images are 12bits
+        return 255 - cv2.cvtColor(dmap_1d, cv2.COLOR_GRAY2RGB)
+
+    def slice_depth(self, dmap_1d, min_dist_perc, max_dist_perc):  # strech to show in detail part of the depth map
+        return np.uint8((((np.float32(dmap_1d) / 255) - min_dist_perc) / (max_dist_perc - min_dist_perc)) * 255)
+
+    def stop(self):
+        self.depth_stream.stop()
+        self.rgb_stream.stop()
+        openni2.unload()
+        # print("Terminated")
+
+    def set_display_on(self):
+        self.display = True
+
+    def set_display_off(self):
+        self.display = False

@@ -1,0 +1,23 @@
+{
+  "version": 6,
+  "text_fields": {
+    "log_folder": "/root/engine_logs",
+    "remote_logs_url": "logs.beamforbowl.com",
+    "remote_logs_port": "5003",
+    "dynamic_surface_far_plane": "1477",
+    "dynamic_surface_near_plane": "1292",
+    "dynamic_surface_min_factor": "8",
+    "dynamic_surface_change_threshold": "0",
+    "x_offset": "0",
+    "y_offset": "0",
+    "y_scale": "0",
+    "x_scale": "0"
+
+  },
+  "switches": {
+    "save_debug_files": true,
+    "dynamic_surface_debug": false,
+    "dynamic_surface_manual_mask_support": true,
+    "flip_data":false
+  }
+}
