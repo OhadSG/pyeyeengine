@@ -1,218 +1,194 @@
-import queue
-import json
-
-import pytz
+import inspect
+import os
 import socket as Socket
-from datetime import datetime, timezone
-from pyeyeengine.utilities.preferences import EnginePreferences
-from pyeyeengine.utilities.session_manager import *
-import logging
-import logging.handlers
-from .metrics import Counter
+from datetime import date, datetime, timezone
+import json
+import sys
+import pytz
 
-CONNECTION_TIMEOUT = 5
+ENABLED = True
+VERBOSE = False
+ENABLED_SEND_TO_REMOTE = True
 ENABLE_WRITE_TO_FILE = True
+ENABLE_DEBUG_LOGS = True
+BASE_PATH = os.path.dirname(os.path.realpath(__file__))
+LOG_FOLDER_PATH = BASE_PATH + "/logs/"
 
-logger = logging.getLogger(__name__)
+GREEN = '\033[0;32m'
+RED = '\033[0;31m'
+BLUE = '\033[0;34m'
+PURPLE = '\033[0;35m'
+YELLOW = '\033[0;93m'
+WHITE = '\033[0m'
 
-def init_logging(preferences: EnginePreferences = EnginePreferences.getInstance()):
-    root_logger = logging.getLogger()
-    root_logger.setLevel(preferences.log_level)
+REMOTE_LOGS_URL = "logs.beamforbowl.com"
+REMOTE_LOGS_PORT = 5003
 
-    text_formatter = ColoredFormatter(TextFormatter())
+class Log():
+    # DEBUG
+    def d(msg=None, flow = "standard", extra_details = None):
+        if VERBOSE:
+            Log.send_to_remote("DEBUG", flow, msg if msg is not None else '', extra_details=extra_details)
 
-    stderr_handler = logging.StreamHandler()
-    stderr_handler.setFormatter(text_formatter)
-    root_logger.addHandler(stderr_handler)
+        if ENABLED and ENABLE_DEBUG_LOGS:
+            (filename, function, line) = Log.get_frame_info()
+            log_text = "{}DEBUG   [{}: {}(), {}]: {}\033[0m".format(GREEN, filename, function, line,
+                                                                    msg if msg is not None else '')
 
-    if preferences.logs_file_handler_enabled:
-        versioned_log_folder = os.path.join(preferences.log_folder, Log.get_engine_version())
-        os.makedirs(versioned_log_folder, exist_ok=True)
-        file_handler = logging.handlers.TimedRotatingFileHandler(os.path.join(versioned_log_folder, 'log'), when='D')
-        file_handler.setFormatter(text_formatter)
-        root_logger.addHandler(file_handler)
+            if extra_details is not None:
+                log_text = log_text + " [Details: {}]".format(json.dumps(extra_details))
 
-        file_json_handler = logging.handlers.TimedRotatingFileHandler(os.path.join(preferences.log_folder, 'json-log'), when='D')
-        file_json_handler.setFormatter(JsonFormatter())
-        root_logger.addHandler(file_json_handler)
+            print(log_text)
 
-    if preferences.remote_logs_enabled:
-        logger.info('Creating remote logger')
+            if ENABLE_WRITE_TO_FILE:
+                Log.write_to_file(log_text)
 
-        # we create a queue so that the logs are sent in a dedicated thread
-        log_queue = queue.Queue()
+    # INFO
+    def i(msg=None, flow = "standard", extra_details = None):
+        Log.send_to_remote("INFO", flow, msg if msg is not None else '', extra_details=extra_details)
+        if ENABLED:
+            (filename, function, line) = Log.get_frame_info()
+            log_text = "{}INFO    [{}: {}(), {}]: {}\033[0m".format(BLUE, filename, function, line,
+                                                                    msg if msg is not None else '')
 
-        # create a handler that sends the logs to the queue
-        root_logger.addHandler(logging.handlers.QueueHandler(log_queue))
+            if extra_details is not None:
+                log_text = log_text + " [Details: {}]".format(json.dumps(extra_details))
 
-        # create a thread that will send logs that are in the queue
-        queue_listener = logging.handlers.QueueListener(log_queue, RemoteHandler(preferences))
-        queue_listener.start()
+            print(log_text)
 
-    root_logger.addHandler(MetricsHandler())
+            if ENABLE_WRITE_TO_FILE:
+                Log.write_to_file(log_text)
 
+    # WARNING
+    def w(msg=None, flow = "standard", extra_details = None):
+        Log.send_to_remote("WARNING", flow, msg if msg is not None else '', extra_details=extra_details)
+        if ENABLED:
+            (filename, function, line) = Log.get_frame_info()
+            log_text = "{}WARNING [{}: {}(), {}]: {}\033[0m".format(YELLOW, filename, function, line,
+                                                                    msg if msg is not None else '')
 
-class TextFormatter(logging.Formatter):
-    def format(self, record):
-        res = "{} - {}   [{}: {}(), {}]: {}".format(
-            super().formatTime(record),
-            record.levelname,
-            record.name,
-            record.funcName,
-            record.lineno,
-            record.msg,
-        )
+            if extra_details is not None:
+                log_text = log_text + " [Details: {}]".format(json.dumps(extra_details))
 
-        extra_fields = get_extra_fields(record)
-        if len(extra_fields) > 0:
-            res += ' ' + json.dumps(extra_fields)
+            print(log_text)
 
-        if record.exc_info is not None:
-            res += '\n' + super().formatException(record.exc_info)
+            if ENABLE_WRITE_TO_FILE:
+                Log.write_to_file(log_text)
 
-        return res
+    # ERROR
+    def e(msg=None, flow = "standard", extra_details = None):
+        Log.send_to_remote("ERROR", flow, msg if msg is not None else '', extra_details=extra_details)
+        if ENABLED:
+            (filename, function, line) = Log.get_frame_info()
+            log_text = "{}ERROR   [{}: {}(), {}]: {}\033[0m".format(RED, filename, function, line,
+                                                                    msg if msg is not None else '')
 
+            if extra_details is not None:
+                log_text = log_text + " [Details: {}]".format(json.dumps(extra_details))
 
-class ColoredFormatter(logging.Formatter):
-    """
-    Adds color to any formatter.
-    """
+            print(log_text)
 
-    GREEN = '\033[0;32m'
-    RED = '\033[0;31m'
-    BLUE = '\033[0;34m'
-    PURPLE = '\033[0;35m'
-    YELLOW = '\033[0;93m'
-    WHITE = '\033[0m'
+            if ENABLE_WRITE_TO_FILE:
+                Log.write_to_file(log_text)
 
-    COLORS = {
-        'WARNING': YELLOW,
-        'INFO': BLUE,
-        'DEBUG': GREEN,
-        'CRITICAL': YELLOW,
-        'ERROR': RED
-    }
+    # TODO
+    def t(msg=None):
+        Log.send_to_remote("TODO", msg if msg is not None else '')
+        if ENABLED:
+            (filename, function, line) = Log.get_frame_info()
+            log_text = "{}TODO    [{}: {}(), {}]: {}\033[0m".format(PURPLE, filename, function, line,
+                                                                    msg if msg is not None else '')
+            print(log_text)
 
-    def __init__(self, inner_formatter: logging.Formatter):
-        super().__init__()
-        self.inner_formatter = inner_formatter
+            if ENABLE_WRITE_TO_FILE:
+                Log.write_to_file(log_text)
 
-    def format(self, record):
-        inner_res = self.inner_formatter.format(record)
-        color = self.COLORS.get(record.levelname)
-        if color is None:
-            return inner_res
+    # CALLER
+    def caller():
+        if ENABLED:
+            (filename, function, line) = Log.get_frame_info()
+            (filename1, function1, line1) = Log.get_frame_info(3)
+            print("{}CALLER  [{}: {}(), {}]: {}\033[0m".format(GREEN, filename, function, line,
+                                                               "Called from [{}: {}(), {}]".format(filename1, function1, line1)))
+
+    def get_engine_version():
+        BASE_PATH = os.path.dirname(os.path.realpath(__file__))
+        FULL_VERSION_FILE_NAME = "full_version.txt"
+        FULL_VERSION_FILE_PATH = BASE_PATH + "/../" + FULL_VERSION_FILE_NAME
+
+        if os.path.isfile(FULL_VERSION_FILE_PATH):
+            with open(FULL_VERSION_FILE_PATH, "r") as file:
+                version = file.readline()
+                return version
         else:
-            return color + inner_res + self.WHITE
+            return "1.0.7.1111"
 
-
-log_record_counter = Counter(
-    'log_count',
-    namespace='pyeye',
-)
-
-class MetricsHandler(logging.Handler):
-    """
-    Creates metrics based on logs.
-    """
-    def emit(self, record: logging.LogRecord) -> None:
-        log_record_counter.inc({
-            'level': record.levelname,
-        })
-
-
-class RemoteHandler(logging.Handler):
-    logger = logging.getLogger(__name__ + '.KibanaHandler')
-
-    def __init__(self, preferences: EnginePreferences):
-        super().__init__()
-
-        self.socket = None
-        self.host = preferences.remote_logs_host
-        self.port = preferences.remote_logs_port
-        self.endpoint = '{}:{}'.format(self.host, self.port)
-
-        if self.endpoint == 'logs.beamforbowl.com:5003':
-            logger.info('Using weird remote log formatter')
-            self.setFormatter(WeirdRemoteFormatter())
-        else:
-            logger.info('Using JSON remote log formatter')
-            self.setFormatter(JsonFormatter())
-
-    def __create_socket(self):
-        logger.info('Connecting to {}'.format(self.endpoint))
-        socket = Socket.socket(Socket.AF_INET, Socket.SOCK_STREAM)
-        socket.settimeout(CONNECTION_TIMEOUT)
-        socket.connect((self.host, self.port))
-
-        RemoteHandler.logger.info("Successfully connected to remote log server {}".format(self.endpoint))
-
-        return socket
-
-    def cleanup(self):
-        RemoteHandler.logger.info("RemoteLogger cleanup")
-        self.socket.close()
-
-    def emit(self, record: logging.LogRecord):
-        if self.socket is None:
-            self.socket = self.__create_socket()
-
-        if record.name == self.logger.name:
-            # don't emit KibanaHandler's own logs, may cause infinite recursion
+    def get_frame_info(frames_back=2):
+        if ENABLED == False:
             return
-        record_text = self.formatter.format(record)
-        RemoteHandler.logger.debug("Sending log {}".format(record_text))
 
         try:
-            self.socket.sendall(bytes(record_text + '\n', "utf-8"))
+            if inspect.stack(0)[frames_back] == None:
+                return "Unknown", "Log", "Origin"
+            else:
+                frame = inspect.stack(0)[frames_back]
+                function = frame.function
+                line = inspect.getlineno(frame[0])
+                filename = os.path.basename(frame.filename)
+
+            return filename, function, line
         except:
-            RemoteHandler.logger.exception("Error when trying to send log. Endpoint: {}".format(self.endpoint))
-            self.socket = None
+            return "Unknown", "Log", "Origin"
 
+    # def write_to_file(log_text):
+    #     if True:
+    #         Log.send_to_remote(log_text)
+    #
+    #     if os.path.exists(LOG_FOLDER_PATH + "log.txt"):
+    #         outFile = open(LOG_FOLDER_PATH + "log.txt", "a+")
+    #     else:
+    #         outFile = open(LOG_FOLDER_PATH + "log.txt", "w+")
+    #
+    #     outFile.write(log_text)
+    #     outFile.write("\n")
+    #     outFile.close()
 
-class JsonFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
-        obj = {
-            "level": record.levelname,
-            "loggerName": record.name,
-            "message": record.msg,
-            "lineNumber": record.lineno,
-            "function": record.funcName,
-            "threadName": record.threadName,
-            "created": super().formatTime(record, '%Y-%m-%dT%H:%M:%S%z'),
-            "file": record.filename,
-            "extra": {
-                **get_extra_fields(record),
-                'engine_version': Log.get_engine_version(),
-                'serial_number': Log.get_system_serial(),
-            },
-        }
-        if record.exc_info is not None:
-            obj["stacktrace"] = self.formatException(record.exc_info)
-        return json.dumps(obj)
+    def get_system_serial():
+        return open("/sys/devices/virtual/android_usb/android0/iSerial", "r").read()
 
+    def write_to_file(log_text):
+        # today = str(date.today()).replace("-", "")
+        today = str(date.today())
+        log_file_location = "/root/engine_logs/{}".format(Log.get_engine_version())
+        log_file_name = "{}/{}.txt".format(log_file_location, today)
+        os.system("mkdir -p /root/engine_logs")
+        os.system("mkdir -p {}".format(log_file_location))
 
-class WeirdRemoteFormatter(logging.Formatter):
-    """
-    Formats logs in a way that our Logstash/Kibana instance on AWS
-    can read.
-    It's a pretty weird format, it'd be easier to just use JSON. Maybe someday.
-    """
-    def format(self, record: logging.LogRecord) -> str:
+        output_file = open("{}".format(log_file_name), "a+")
+        output_file.write("{} {}".format(Log.get_developer_time(), log_text))
+        output_file.write("\n")
+        output_file.close()
+
+    def get_developer_time():
+        local_timezone = pytz.timezone('Asia/Jerusalem')
+        format = "%d/%m/%Y %H:%M:%S"
+        return datetime.now(local_timezone).strftime(format)
+
+    def send_to_remote(log_level, flow="standard", message="", extra_details=None):
+        if ENABLED_SEND_TO_REMOTE == False:
+            return
+
         # All log fields
         device_time = datetime.now(timezone.utc).isoformat()
         engine_version = Log.get_engine_version()
         serial = Log.get_system_serial()
-        platform = " "
-        # platform = open("/sys/devices/virtual/android_usb/android0/iManufacturer", "r").read()
-        device_raw = '{' + '"platform":"{0}", "serial":"{1}", "engine_version":"{2}"'.format(platform, serial,
-                                                                                             engine_version) + '}'
+        platform = open("/sys/devices/virtual/android_usb/android0/iManufacturer", "r").read()
+        device_raw = '{' +'"platform":"{0}", "serial":"{1}", "engine_version":"{2}"'.format(platform, serial, engine_version) + '}'
         extra_details_string = None
 
-        extra_details = get_extra_fields(record)
-
-        if len(extra_details) > 0:
-            extra_details['session_id'] = "{}".format(get_session_id())
+        if extra_details is not None:
+            # if type(extra_details) is dict:
+            extra_details['flow'] = "{}".format(flow)
             # CPU Temp: /sys/class/thermal/thermal_zone1/temp
 
             try:
@@ -223,153 +199,14 @@ class WeirdRemoteFormatter(logging.Formatter):
             except Exception as e:
                 print("[ERROR] Could not create JSON: {}".format(e))
         else:
-            extra_details_string = json.dumps({"session_id": get_session_id()})
+            extra_details_string = json.dumps({"flow": flow})
 
-        return "[{}] | {} | {}:{} | {} |".format(
-            device_time,
-            device_raw,
-            record.levelname,
-            record.message,
-            extra_details_string if extra_details_string is not None else ""
-        )
+        text_to_send = "[{}] | {} | {}:{} | {} |".format(device_time, device_raw, log_level, message, extra_details_string if extra_details_string is not None else "")
 
-
-skipped_fields = {
-    'name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 'filename', 'module',
-    'exc_info', 'exc_text', 'stack_info', 'lineno', 'funcName', 'created', 'msecs',
-    'relativeCreated', 'thread', 'threadName', 'processName', 'process',
-}
-
-def get_extra_fields(record):
-    return {
-        key: value
-        for (key, value) in record.__dict__.items()
-        if key not in skipped_fields
-    }
-
-
-class Log:
-    __serial_number = None
-
-    @staticmethod
-    def d(msg=None, flow = "standard", extra_details = None):
-        if extra_details is None:
-            extra_details = {}
-        logger.debug(msg, extra={**extra_details, 'flow': flow})
-
-    @staticmethod
-    def i(msg=None, flow = "standard", extra_details = None):
-        if extra_details is None:
-            extra_details = {}
-        logger.info(msg, extra={**extra_details, 'flow': flow})
-
-    @staticmethod
-    def w(msg=None, flow = "standard", extra_details = None):
-        if extra_details is None:
-            extra_details = {}
-        logger.warning(msg, extra={**extra_details, 'flow': flow})
-
-    @staticmethod
-    def e(msg=None, flow = "standard", extra_details = None):
-        if extra_details is None:
-            extra_details = {}
-        logger.error(msg, extra={**extra_details, 'flow': flow})
-
-    ########## Utilities ##########
-
-    @staticmethod
-    def get_engine_version() -> str:
-        return get_engine_version()
-
-    @staticmethod
-    def get_system_serial():
-        serial_number = Log.__serial_number
-        if serial_number is None:
-            try:
-                serial_number = get_serial_number()
-            except:
-                serial_number = 'ERROR'
-                Log.__serial_number = serial_number
-                logger.exception('Failed to get serial number')
-
-            Log.__serial_number = serial_number
-
-        return serial_number
-
-    @staticmethod
-    def get_developer_time():
-        local_timezone = pytz.timezone('Asia/Jerusalem')
-        format = "%d/%m/%Y %H:%M:%S"
-        return datetime.now(local_timezone).strftime(format)
-
-    @staticmethod
-    def prepare_logs_for_upload(dest_folder):
-        os.system('cp {}/{}/* {}'.format(
-            EnginePreferences.getInstance().log_folder,
-            Log.get_engine_version(),
-            dest_folder,
-        ))
-
-def cached(inner_func):
-    cached_res = None
-
-    def inner(*args, **kwargs):
-        nonlocal cached_res
-        if cached_res is None:
-            cached_res = inner_func(*args, **kwargs)
-        return cached_res
-
-    return inner
-
-
-def get_serial_number():
-    # the serial number is stored in a binary file located at /dev/__properties__/u:object_r:system_prop:s0.
-    # running `getprop ro.serialno` in Android's shell reads the serial number from this file.
-    # somewhere in the file this appears: serialno211092406301800sys.serialno
-
-    path = os.getenv('PYEYE_SERIAL_NUMBER_PATH', default='/dev/__properties__/u:object_r:system_prop:s0')
-
-    with open(path, 'rb') as system_prop_file:
-        system_prop = system_prop_file.read()
-
-    # find the start index
-    start_pattern = b'serialno'
-    start_pattern_index = system_prop.find(start_pattern)
-    if start_pattern_index == -1:
-        raise Exception('Failed to find start pattern in system prop file')
-    start_serial_index = start_pattern_index + len(start_pattern)
-
-    # find the end index
-    end_pattern = b'sys.serialno'
-    end_pattern_index = system_prop.find(end_pattern, start_serial_index)
-    if end_pattern_index == -1:
-        raise Exception('Failed to find end pattern in system prop file')
-
-    # get the serial using the indices
-    serial = system_prop[start_serial_index:end_pattern_index]
-
-    # this serial number contains a lot of binary invisible characters
-    # so we need to remove them
-    serial = ''.join(
-        chr(c)
-        for c in serial
-        if ord('0') <= c <= ord('z')
-    )
-
-    if len(serial) != 15:
-        raise Exception('Serial number must be 15 characters long, instead it was {}'.format(len(serial)))
-
-    return serial
-
-@cached
-def get_engine_version() -> str:
-    BASE_PATH = os.path.dirname(os.path.realpath(__file__))
-    FULL_VERSION_FILE_NAME = "full_version.txt"
-    FULL_VERSION_FILE_PATH = BASE_PATH + "/../" + FULL_VERSION_FILE_NAME
-
-    if os.path.isfile(FULL_VERSION_FILE_PATH):
-        with open(FULL_VERSION_FILE_PATH, "r") as file:
-            version = file.readline()
-            return version
-    else:
-        return "Unknown"
+        try:
+            socket = Socket.socket(Socket.AF_INET, Socket.SOCK_STREAM)
+            socket.connect((REMOTE_LOGS_URL, REMOTE_LOGS_PORT))
+            socket.sendall(bytes(text_to_send, "utf-8"))
+            socket.close()
+        except Exception as e:
+            print("[ERROR] Error when trying to send log: {} [{}, {}]".format(e, REMOTE_LOGS_URL, REMOTE_LOGS_PORT))

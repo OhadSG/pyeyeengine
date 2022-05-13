@@ -81,7 +81,7 @@ class ShapeDetector:
         if (self.is_contour_circle(contour)):
             shape = "circle"
 
-        Log.d("[TABLE] Found table shape", extra_details={"shape": shape})
+        Log.i("[TABLE] Found table shape", extra_details={"shape": shape})
 
         # otherwise, we don't know
         return shape

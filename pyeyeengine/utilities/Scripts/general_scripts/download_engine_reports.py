@@ -50,4 +50,4 @@ def download_files(system_serial, destination):
         client.download_file(BUCKET, k, dest_pathname)
 
 if __name__ == '__main__':
-    download_files("170398364203055/remote_installed", "/Users/galsabag/Downloads")
+    download_files("180733444100898", "/Users/galsabag/Downloads")

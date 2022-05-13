@@ -13,24 +13,17 @@ from pyeyeengine.tracking.tracker import Tracker, TrackedObject
 from pyeyeengine.utilities.global_params import EngineType
 import pyeyeengine.utilities.global_params as Globals
 from pyeyeengine.camera_utils.frame_manager import FrameManager
-from .engine_base import EngineBase
 
-class LightEyeEngine(EngineBase):
-    engine_type = EngineType.LightTouch
-
-    def __init__(self,
-                 frame_manager: FrameManager,
-                 background_model=ChangeDetector(),
+class LightEyeEngine:
+    def __init__(self, background_model=ChangeDetector(),
                  tracker=Tracker(), calibrator=None, fps_counter=FPSCounter(),
                  key_pts_limiter=KeyPointsLimiter(screen_width=1280, screen_height=800),
                  key_pts_extractor=SilhouetteExtractor()):
-        super().__init__()
-
-        self.frame_manager = frame_manager
+        self.engine_type = EngineType.LightTouch
         self._background_model = background_model
         self._object_detector = LightTouchDetector()
         self._tracker = tracker
-        self._calibrator = calibrator if calibrator is not None else AutoCalibrator(self.frame_manager, (320, 240))
+        self._calibrator = calibrator if calibrator is not None else AutoCalibrator((320, 240))
         self._key_pts_extractor = key_pts_extractor
         if hasattr(self._key_pts_extractor, 'max_height_above_playing_surface'):
             self._object_detector.max_search_height = self._key_pts_extractor.max_height_above_playing_surface
@@ -43,10 +36,10 @@ class LightEyeEngine(EngineBase):
 
     def process_frame(self, display=False, show_time=False, debug=False):
         if show_time:
-            start_time = time.monotonic()
+            start_time = time.clock()
 
-        self.frame_manager.depth_stream.set_resolution(Globals.Resolution(320, 240))
-        depth_map = self.frame_manager.depth_stream.get_frame()
+        FrameManager.getInstance().set_depth_resolution(Globals.Resolution(320, 240))
+        depth_map = FrameManager.getInstance().get_depth_frame()
         self._background_model.update_background_model(depth_map, self._object_detector.get_binary_objects())
         diff_map = self._background_model.detect_change(depth_map)
         object_voxels = self._object_detector.process_frame(diff_map, depth_map)
@@ -57,12 +50,12 @@ class LightEyeEngine(EngineBase):
         self._fps_counter.process_frame()
 
         if show_time:
-            end_time = time.monotonic()
+            end_time = time.clock()
             print("engine run time (ms): %f" % ((end_time - start_time) * 1000))
 
         if display:
-            self.frame_manager.rgb_stream.set_resolution(Globals.Resolution(320, 240))
-            rbg = self.frame_manager.rgb_stream.get_frame()
+            FrameManager.getInstance().set_rgb_resolution(Globals.Resolution(320, 240))
+            rbg = FrameManager.getInstance().get_rgb_frame()
             self.display_contours_on_rbg(self._object_detector.contours, object_voxels, rbg, self._calibrator)
         if debug:
             cv2.imshow("depth_map", depth_map*5)

@@ -21,7 +21,7 @@ class EngineThread:
         self._set_should_resume(True)
         camera = CameraReader()
         engine = EyeEngine(camera, key_pts_extractor=FootEdgeExtractor(), calibrator=AutoCalibrator(screen_resolution=(0, 0)))
-        self._thread = threading.Thread(name='EngineThread', target=self._engine_loop, args=(camera, engine))
+        self._thread = threading.Thread(target=self._engine_loop, args=(camera, engine))
         self._thread.daemon = True
         self._thread.start()
 

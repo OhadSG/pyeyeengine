@@ -12,30 +12,24 @@ from pyeyeengine.utilities.file_uploader import FileUploader
 from pyeyeengine.camera_utils.frame_manager import FrameManager
 from pyeyeengine.object_detection.shape_detector import ShapeDetector
 from pyeyeengine.object_detection.table_detector import TableDetector
-from pyeyeengine.utilities.file_uploader import FileUploader
-from pyeyeengine.calibration.ORB_single_image.ORB_single_image_calibration import SingleImageCalibrator
-from pyeyeengine.utilities import helper_functions as Helper
 
 SAVE_MASK_DEBUG = True
 
 FILE_PATH = os.path.dirname(os.path.realpath(__file__))
 TABLE_MASK_DEBUG_FOLDER = FILE_PATH + "/table_mask/"
 GRID_IMAGES_SAVE_PATH = FILE_PATH + "/grid_images/"
-HOMOGRAPHY_FILE = FILE_PATH + "/warp_mat_cam_2_displayed.npy"
+TRANSFORMATION_FILE_NAME = "warp_mat_cam_2_displayed"
+TRANSFORMATION_FILE_PATH_NO_EXT = os.path.join(FILE_PATH, TRANSFORMATION_FILE_NAME)
 GRID_FORMAT = "chessboard"
-DEFAULT_TEMPLATE_IMAGE_PATH = FILE_PATH + "/ORB_single_image/table_detection_template.jpg"
+
 
 # log = open("calibration.log", "a")
 # sys.stdout = log
 
 
 class AutoCalibrator:
-    def __init__(self,
-                 frame_manager: FrameManager,
-                 screen_resolution=None,
-                 warp_mat_cam_2_displayed_path=HOMOGRAPHY_FILE,
+    def __init__(self, screen_resolution=None, warp_mat_cam_2_displayed_path=TRANSFORMATION_FILE_PATH_NO_EXT + ".npy",
                  image_pairs_save_path=GRID_IMAGES_SAVE_PATH):
-        self.frame_manager = frame_manager
         self.manual_mask = False
         self.mask_edges = []
         self.calibrate_success = False
@@ -49,15 +43,7 @@ class AutoCalibrator:
         self.projection_flip_type = "none"
         self.table_mask = np.uint8(np.ones((960, 1280, 3)) * 255)  # entire field of view is default
         if os.path.isfile(warp_mat_cam_2_displayed_path):
-            try:
-                self.warp_mat_cam_2_displayed = np.load(warp_mat_cam_2_displayed_path)
-            except Exception as e:
-                Log.e("Error loading on-file calibration, please recalibrate the engine", extra_details={"exception": "{}".format(e)})
-                self.warp_mat_cam_2_displayed = np.eye(3)
-                try:
-                    os.remove(warp_mat_cam_2_displayed_path)
-                except Exception as e:
-                    Log.e("Error removing saved calibration file", extra_details={"exception": "{}".format(e)})
+            self.warp_mat_cam_2_displayed = np.load(warp_mat_cam_2_displayed_path)
         else:
             self.warp_mat_cam_2_displayed = np.eye(3)
         self.table_shape = None
@@ -65,36 +51,15 @@ class AutoCalibrator:
 
     def calibrate(self, mode="table", recollect_imgs=True, screen_setter=None):
         Log.i("Starting Old Calibration", flow="calibration")
-
-        if not os.path.isfile(HOMOGRAPHY_FILE):
-            single_image_calibrator = SingleImageCalibrator(
-                frame_manager=self.frame_manager,
-                screen_resolution=Globals.Resolution(self.screen_width, self.screen_height))
-            single_image_calibrator.calibrate_with_screen_setter(screen_setter=screen_setter, mode=mode)
-            self.warp_mat_cam_2_displayed = np.load(HOMOGRAPHY_FILE)
-
-        if mode == "table":
-            if not os.path.exists(FILE_PATH + "/table_data_manual.npz"):
-                self.get_table_mask(screen_setter)
-            else:
-                Log.i("Manual mask found, will ignore auto table mask", flow="calibration")
-                self.load_table_data()
-
-        single_image_calibrator = SingleImageCalibrator(
-            frame_manager=self.frame_manager,
-            screen_resolution=Globals.Resolution(self.screen_width, self.screen_height)
-        )
-        single_image_calibrator.calibrate_with_screen_setter(screen_setter=screen_setter, mode=mode, delay=2)
-        self.warp_mat_cam_2_displayed = single_image_calibrator.warp_mat_cam_2_displayed
-
-        self.calibrate_success = single_image_calibrator.calibrate_success
-
-        # self.calibrator_pattern_collector.screen_setter = screen_setter
-        # self.get_matching_corners_and_find_homography(recollect_imgs)
+        if mode == "table" and not os.path.exists(FILE_PATH + "/table_data_manual.npz"):
+            self.get_table_mask(screen_setter)
+        else:
+            Log.i("Manual mask found, will ignore auto table mask", flow="calibration")
+        self.calibrator_pattern_collector.screen_setter = screen_setter
+        self.get_matching_corners_and_find_homography(recollect_imgs)
 
     def get_table_mask(self, image_server=None):
-        # white_screen = self.generate_blurry_white_screen()
-        white_screen = self.get_background_image()
+        white_screen = self.generate_blurry_white_screen()
         if platform == "win32":
             cv2.namedWindow("white_background", cv2.WINDOW_NORMAL)
             cv2.setWindowProperty("white_background", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -116,27 +81,26 @@ class AutoCalibrator:
 
         for try_num in range(10):
             Log.d("Attempt #{} to find table".format(try_num), flow="calibration")
-            self.frame_manager.depth_stream.set_resolution(Globals.DEPTH_HIGH_QUALITY)
-            clean_depth = self.frame_manager.depth_stream.get_frame()
+            FrameManager.getInstance().set_depth_resolution(Globals.DEPTH_HIGH_QUALITY)
+            clean_depth = FrameManager.getInstance().get_depth_frame()
             depth_map = cv2.resize(clean_depth, (0, 0), fx=2, fy=2, interpolation=cv2.INTER_NEAREST)
-            self.frame_manager.rgb_stream.set_resolution(Globals.RGB_MEDIUM_QUALITY)
-            rbg = self.frame_manager.rgb_stream.get_frame()
-            self.frame_manager.rgb_stream.set_resolution(Globals.RGB_HIGH_QUALITY)
-            rgb_high_res = self.frame_manager.rgb_stream.get_frame()
+            FrameManager.getInstance().set_rgb_resolution(Globals.RGB_MEDIUM_QUALITY)
+            rbg = FrameManager.getInstance().get_rgb_frame()
+            FrameManager.getInstance().set_rgb_resolution(Globals.RGB_HIGH_QUALITY)
+            rgb_high_res = FrameManager.getInstance().get_rgb_frame()
 
             tform_small_to_big = self.get_warp_ORB(rgb_high_res, rbg)
 
             # tform_small_to_big = self.get_warp_320x240_640x480(rgb_high_res, rbg)
             depth_map_tformed = cv2.warpPerspective(depth_map, np.linalg.inv(tform_small_to_big),
                                                     (depth_map.shape[1], depth_map.shape[0]), cv2.INTER_NEAREST)
-            FileUploader.save_image(depth_map_tformed, "depth_transformed.png", folder="table_detection/")
+            FileUploader.upload_image(depth_map_tformed, "depth_transformed.png")
             self.table_contour, self.table_shape = self.tableDetector.detect_table(depth_map_tformed, rgb_high_res,
                                                                                    save_path=FILE_PATH + "/")
 
             if self.table_contour is not None:
                 self.table_contour /= 4
                 self.table_mask = np.zeros_like(self.table_mask)
-                # FIXME: Find out why mask breaks
                 self.tableDetector.draw_contours([np.int32(np.round(self.table_contour * 4))], rgb_high_res, "possible_mask.png")
                 self.table_mask = cv2.drawContours(image=self.table_mask,
                                                    contours=[np.int32(np.round(self.table_contour * 4))],
@@ -150,19 +114,19 @@ class AutoCalibrator:
                 break  # if contour found use it
 
         cv2.imwrite(FILE_PATH + "/table_mask.png", self.table_mask)
-        FileUploader.save_image(self.table_mask, "table_mask.png", folder="table_detection/")
+        FileUploader.upload_image(self.table_mask, "table_mask.png")
 
         if not found:
             Log.i("Table Not Found", flow="calibration")
 
         if SAVE_MASK_DEBUG:
-            FileUploader.save_image(clean_depth, "cleanDepthMap.png", folder="table_detection/")
-            FileUploader.save_image(depth_map, "depthMap.png", folder="table_detection/")
-            FileUploader.save_image(rbg, "rgb.png", folder="table_detection/")
-            FileUploader.save_image(rgb_high_res, "rgbHR.png", folder="table_detection/")
+            FileUploader.upload_image(clean_depth, "cleanDepthMap.png")
+            FileUploader.upload_image(depth_map, "depthMap.png")
+            FileUploader.upload_image(rbg, "rgb.png")
+            FileUploader.upload_image(rgb_high_res, "rgbHR.png")
 
     def load_table_data(self):
-        ## FIXME: find where the issue occurs when loading table mask and shape is not in the archive
+
         if os.path.exists(FILE_PATH + "/table_data_manual.npz"):
             Log.i("Loading manual mask", flow="calibration")
             table_data = np.load(FILE_PATH + "/table_data_manual.npz", allow_pickle=True)
@@ -179,27 +143,8 @@ class AutoCalibrator:
             self.table_mask = table_data["table_mask"]
             return "success"
         else:
-            Log.w("Error loading table data, please rerun calibration!", flow="calibration", extra_details={"error":"table data files not found"})
-            raise CalibrationFailed("Error loading table data, please rerun calibration!")
-
-    def get_background_image(self):
-        template = cv2.imread(DEFAULT_TEMPLATE_IMAGE_PATH)
-        template = SingleImageCalibrator.edit_template(template)
-        image = cv2.cvtColor(template, cv2.COLOR_RGB2BGR)
-
-        print("{}".format(image.shape))
-
-        text = 'Identifying Table'
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        bottomLeftCornerOfText = (int((image.shape[1] / 4) - 30), int((image.shape[0] / 2)))
-        fontScale = 3
-        fontColor = (255, 255, 255)
-        lineType = 8
-
-        cv2.putText(image, text, bottomLeftCornerOfText, font, fontScale, (0, 0, 0), 10)
-        cv2.putText(image, text, bottomLeftCornerOfText, font, fontScale, fontColor, lineType)
-
-        return Helper.frame_image(image, 2)
+            Log.e("Error loading table data, please rerun calibration!", flow="calibration", extra_details={"error":"file not found"})
+            #raise CalibrationFailed("Can't load table data. No table data file. Please rerun calibration.")
 
     def generate_blurry_white_screen(self):
         white_screen = np.float32(np.zeros((self.screen_height, self.screen_width, 3)))
@@ -273,7 +218,7 @@ class AutoCalibrator:
 
         height, width, _ = rgb_large.shape
         warped_image = cv2.warpPerspective(rgb_large, h, (width, height))
-        FileUploader.save_image(warped_image, "warped_projection.png", folder="table_detection/")
+        FileUploader.upload_image(warped_image, "warped_projection.png")
 
         return h
 
@@ -327,7 +272,7 @@ class AutoCalibrator:
                 self.projection_flip_type = flip_types[inliers_perc.argmax()]
                 Log.i('Old Calibration Successful', flow="calibration")
                 self.warp_mat_cam_2_displayed = warp_mat
-                np.save(HOMOGRAPHY_FILE, self.warp_mat_cam_2_displayed)
+                np.save(TRANSFORMATION_FILE_PATH_NO_EXT, self.warp_mat_cam_2_displayed)
         else:
             Log.e("Old Calibration Failed", flow="calibration", extra_details={"error": "not enough patterns detected"})
             # raise CalibrationFailed(

@@ -12,14 +12,11 @@ from pyeyeengine.utilities import helper_functions as Helper
 from pyeyeengine.utilities.logging import Log
 from pyeyeengine.utilities.file_uploader import FileUploader
 from pyeyeengine.camera_utils.frame_manager import FrameManager
-import pyeyeengine.projector_controller.projector_tools as projector_tools
-from pyeyeengine.camera_utils.frame_stream.rgb_frame_stream import RgbFrameStream
 
 ###### CONSTANTS ######
 SAVE_RESULT = True
 CALIBRATION_DEBUG = False
 
-REQUIRED_CONFIDENCE = 0.2
 MAX_MATCHES = 1000
 GOOD_MATCH_PERCENT = 0.2
 NORMAL_AVERAGING_ITERATIONS = 5
@@ -35,9 +32,8 @@ MASK_FILE_NAME = BASE_PATH + "/../calibrated_mask.npy"
 MAX_CALIBRATION_RETRIES = 10
 ###### CONSTANTS ######
 
-class SingleImageCalibrator:
-    def __init__(self, frame_manager: FrameManager, screen_resolution=GlobalParams.Resolution(1280, 800)):
-        self.frame_manager = frame_manager
+class SingleImageCalibrator():
+    def __init__(self, screen_resolution=GlobalParams.Resolution(1280, 800)):
         self.screen_resolution = screen_resolution
         self.warp_mat_cam_2_displayed = None
         self.calibrate_success = False
@@ -75,15 +71,11 @@ class SingleImageCalibrator:
         # else:
         #     # # Log.e("Engine is not calibrated! Please run calibration!")
 
-    def get_template_image(raw_image=False):
+    def get_template_image():
         Log.d("[CALIBRATION] Delivering template image to admin")
         template = cv2.imread(DEFAULT_TEMPLATE_IMAGE_PATH)
         template = SingleImageCalibrator.edit_template(template)
-
-        if raw_image:
-            return cv2.cvtColor(template, cv2.COLOR_RGB2BGR)
-        else:
-            return cv2.imencode(".png", template)[1].tobytes()
+        return cv2.imencode(".png", template)[1].tobytes()
 
     def edit_template(template):
         modded_template = template
@@ -117,49 +109,10 @@ class SingleImageCalibrator:
         np.save(HOMOGRAPHY_FILE_NAME, self.warp_mat_cam_2_displayed)
         Log.i("[CALIBRATION] Done.")
 
-    def calibrate_with_screen_setter(self, screen_setter=None, table_mask=None, mode="table", calibration_scale_factor = GlobalParams.CALIBRATION_SCALE_FACTOR , sync_normal_calculation = True, delay=0):
-        template_image = SingleImageCalibrator.get_template_image(raw_image=True)
-
-        # if table_mask is not None:
-        #     template_image = cv2.bitwise_and(template_image, template_image, mask=table_mask)
-
-        screen_setter.set_image(template_image)
-        time.sleep(delay)
-        return self.calibrate(mode, calibration_scale_factor, sync_normal_calculation, table_mask)
-
-    def calibrate(
-            self,
-            mode="table",
-            calibration_scale_factor = GlobalParams.CALIBRATION_SCALE_FACTOR,
-            sync_normal_calculation = True,
-            table_mask=np.uint8(np.ones((960, 1280, 3)) * 255)
-    ):
-        if projector_tools.supports_function(projector_tools.FUNCTION_FOCUS):
-            did_succeed = projector_tools.auto_focus()
-            if not did_succeed:
-                self.calibrate_success = False
-                Log.e("[CALIBRATION] New Calibration Failed", extra_details={"reason": "auto-focus failed"})
-                return
-
+    def calibrate(self, mode="table", calibration_scale_factor = GlobalParams.CALIBRATION_SCALE_FACTOR , sync_normal_calculation = True):
         Log.i("[CALIBRATION] Starting New Calibration", extra_details={"mode":mode,"resolution":"{}x{}".format(self.screen_resolution.width, self.screen_resolution.height)})
 
-        template_image = self.matching_template
-
-        # if table_mask is not None:
-        #     cv2.imwrite(BASE_PATH + "/calibration_images/calibration_table_mask.png", table_mask)
-        #     #check mask size!
-        #     template_image = cv2.bitwise_and(template_image, template_image, mask=table_mask)
-
-        self.table_mask = table_mask
-
-        # if FrameManager.getInstance().is_projector_on() == False:
-        #     Log.e("The projector is off, cannot continue with calibration")
-        #     self.calibrate_success = False
-        #     return
-        # else:
-        #     Log.d("The projector is on, continuing with calibration")
-
-        self.frame_manager.rgb_stream.set_resolution_named('large')
+        FrameManager.getInstance().set_rgb_resolution(GlobalParams.SCREEN_RESOLUTION)
 
         retry_attempt = 0
         self.calibration_scale_factor = calibration_scale_factor
@@ -167,14 +120,10 @@ class SingleImageCalibrator:
         while True:
             retry_attempt = retry_attempt + 1
 
-            camera_view = self.frame_manager.rgb_stream.get_frame()
+            camera_view = FrameManager.getInstance().get_rgb_frame()
+            template_confidence, homography, warped = self.find_homography(camera_view, [self.matching_template])
 
-            cv2.imwrite(BASE_PATH + "/calibration_images/reference_rgb_frame.png", camera_view)
-            cv2.imwrite(BASE_PATH + "/calibration_images/comparison_template.png", template_image)
-
-            template_confidence, homography, warped = self.find_homography(camera_view, [template_image])
-
-            if template_confidence > REQUIRED_CONFIDENCE:
+            if template_confidence > 0.35:
                 if CALIBRATION_DEBUG:
                     Log.d("Final Homography:\n{}".format(homography))
 
@@ -187,7 +136,8 @@ class SingleImageCalibrator:
                     thread = Thread(target=self.finalize)
                     thread.start()
 
-                FileUploader.save_image(camera_view, "good_calibration.png", "calibration/")
+                FileUploader.save_image_and_upload(BASE_PATH + "/good_calibration.png", camera_view, "good_calibration.png")
+                FrameManager.getInstance().set_rgb_resolution(GlobalParams.RGB_MEDIUM_QUALITY)
 
                 Log.i("[CALIBRATION] New Calibration Successful", extra_details={"confidence":"{:.1f}".format(template_confidence * 100)})
 
@@ -195,7 +145,8 @@ class SingleImageCalibrator:
 
                 return
             elif retry_attempt >= MAX_CALIBRATION_RETRIES:
-                FileUploader.save_image(camera_view, "bad_calibration.png", "calibration/")
+                FileUploader.save_image_and_upload(BASE_PATH + "/bad_calibration.png", camera_view, "bad_calibration.png")
+                FrameManager.getInstance().set_rgb_resolution(GlobalParams.RGB_MEDIUM_QUALITY)
 
                 Log.e("[CALIBRATION] New Calibration Failed", extra_details={"confidence":"{:.1f}".format(template_confidence * 100)})
 

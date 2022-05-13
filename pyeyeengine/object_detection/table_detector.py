@@ -57,12 +57,12 @@ class TableDetector:
                     image = cv2.drawContours(image, [rounded_contour], 0, color, 1)
             except Exception as e:
                 Log.e("Error drawing contours", extra_details={"error": "{}".format(e)})
-        FileUploader.save_image(image, file_name, folder="table_detection/")
+        FileUploader.upload_image(image, file_name)
 
     def detect_table(self, depth_map, rgb, display=True, save_path=None):
         clean_rgb = rgb.copy()
         contours = self.find_potential_table_contours(depth_map)
-        #Log.d("FOUND CONTOURS: {}".format(len(contours)))
+        # Log.d("FOUND CONTOURS: {}".format(len(contours)))
         self.draw_contours(contours, rgb.copy(), "found_contours.png")
         table_contour = self.decide_which_contour_is_the_table(contours, depth_map)
         self.draw_contours([self.round_int32(table_contour)], rgb.copy(), "possible_table_contour.png")
@@ -70,7 +70,7 @@ class TableDetector:
         if save_path is not None and table_contour is not None:
             rgb_rough_contour = cv2.drawContours(rgb.copy(), [self.round_int32(table_contour)], 0, (255, 0, 255), 1)
             cv2.imwrite(save_path + "table_detected_rough.png", rgb_rough_contour)
-            FileUploader.save_image(rgb_rough_contour, "rough_table_contour.png", folder="table_detection/")
+            FileUploader.upload_image(rgb_rough_contour, "rough_table_contour.png")
 
         table_shape = 'None'
         if table_contour is not None:
@@ -87,14 +87,13 @@ class TableDetector:
             elif self.shapeDetector.detect(table_contour) == 'rectangle':
 
                 table_contour = self.dilate_rect_contour(table_contour, DEPTH_CONTOUR_DILATION*2)
-                FileUploader.save_image(self.draw_table_on_rbg(clean_rgb.copy(), [self.round_int32(table_contour)]),
-                                        "contour_1.png", folder="table_detection/")
+                FileUploader.upload_image(self.draw_table_on_rbg(clean_rgb.copy(), [self.round_int32(table_contour)]), "contour_1.png")
                 table_contour = self.optimize_rectangle_contour_RANSAC(self.round_int32(table_contour), rgb, depth_map)
-                FileUploader.save_image(self.draw_table_on_rbg(clean_rgb.copy(), [self.round_int32(table_contour)]),
-                                        "contour_2.png", folder="table_detection/")
+                FileUploader.upload_image(self.draw_table_on_rbg(clean_rgb.copy(), [self.round_int32(table_contour)]),
+                                          "contour_2.png")
                 table_contour = self.dilate_rect_contour(table_contour, -MARGIN_OF_ERROR)
-                FileUploader.save_image(self.draw_table_on_rbg(clean_rgb.copy(), [self.round_int32(table_contour)]),
-                                        "contour_3.png", folder="table_detection/")
+                FileUploader.upload_image(self.draw_table_on_rbg(clean_rgb.copy(), [self.round_int32(table_contour)]),
+                                          "contour_3.png")
                 table_shape = 'rectangle'
                 Log.d("Found rectangle table")
         # else:
@@ -107,7 +106,7 @@ class TableDetector:
         if save_path is not None:
             cv2.imwrite(save_path + "table_detected.png",
                         self.draw_table_on_rbg(rgb, [self.round_int32(table_contour)]))
-            FileUploader.save_image(self.draw_table_on_rbg(rgb, [self.round_int32(table_contour)]), "table_detected.png", folder="table_detection/")
+            FileUploader.upload_image(self.draw_table_on_rbg(rgb, [self.round_int32(table_contour)]), "table_detected.png")
 
         return table_contour, table_shape
 
@@ -119,9 +118,9 @@ class TableDetector:
 
         self.edges = np.uint8(
             cv2.filter2D(np.uint8(self.edges), -1, np.ones(EDGES_DEPTH_BLUR_KERNEL)) * self.edges) * 255
-        FileUploader.save_image(self.edges, "found_edges.png", folder="table_detection/")
+        FileUploader.upload_image(self.edges, "found_edges.png")
         edges_dilated = cv2.dilate(self.edges, None, iterations=DEPTH_CONTOUR_DILATION)
-        FileUploader.save_image(edges_dilated, "dilated_edges.png", folder="table_detection/")
+        FileUploader.upload_image(edges_dilated, "dilated_edges.png")
         # cv2.imshow('edges_dilated', cv2.resize(edges_dilated, (0, 0), fx=.5, fy=.5))
         # cv2.imshow('edges_dilated', cv2.resize(edges_dilated, (0, 0), fx=.5, fy=.5))
         # cv2.waitKey(0)
@@ -146,7 +145,7 @@ class TableDetector:
         n_componenets, cc_map = cv2.connectedComponents(np.uint8(edges_dilated == 0) * 255)
         # cv2.imshow("cc_map", np.uint8((cc_map/n_componenets)*255))
         # cv2.waitKey(0)
-        FileUploader.save_image(cc_map, "connected_components.png", folder="table_detection/")
+        FileUploader.upload_image(cc_map, "connected_components.png")
         contours = [cv2.findContours(np.uint8(cc_map == idx), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1][-1]
                     for idx in range(1, n_componenets)]
 
@@ -238,12 +237,7 @@ class TableDetector:
             # rect = cv2.minAreaRect(random_pts)
             # box = cv2.boxPoints(rect)
             # box = np.int0(box)
-            # box = self.rectangle_to_trapezoid(relevant_pts, gradient_at_relevant_pts, box, line_dist_thresh=21)
-            new_box = self.rectangle_to_trapezoid(relevant_pts, gradient_at_relevant_pts, box, line_dist_thresh=21)
-
-            if new_box is not None:
-                box = new_box
-
+            box = self.rectangle_to_trapezoid(relevant_pts, gradient_at_relevant_pts, box, line_dist_thresh=21)
             bboxes.append(box)
             rect_only = np.zeros_like(rgb)
             rect_only = cv2.drawContours(rect_only, [self.round_int32(box)], 0, (255, 255, 255), 1)[:, :, 0]
@@ -257,7 +251,7 @@ class TableDetector:
         rgb_edges_toshow = cv2.drawContours(rgb_edges_toshow, [np.int32(np.round(table_contour_original))], 0,
                                             (0, 255, 0), 1)
         cv2.imwrite("./edges.png", rgb_edges_toshow)
-        FileUploader.save_image(rgb_edges_toshow, "rgb_edges.png", folder="table_detection/")
+        FileUploader.upload_image(rgb_edges_toshow, "rgb_edges.png")
         table_contour = self.corners_to_dense_contour(table_contour)
         return np.float32(table_contour)  # -.5# edges locations are rounded up...
 
@@ -309,8 +303,7 @@ class TableDetector:
                     # print(perc_inliers)
                     lines.append(np.float32([vertical_line(0), 0, vertical_line(10), 10]).reshape(1, -1))
                     if np.isnan(vertical_line[0]):
-                        Log.d("Mask will be skewed, aborting")
-                        return None
+                        hi = 5
                 else:
                     lines.append(np.float32([0, line(0), 10, line(10)]).reshape(1, -1))
             else:
@@ -444,11 +437,11 @@ class TableDetector:
     def display(self, depth_map, contours, edges=None):
         # dmap_disp = cv2.cvtColor(np.uint8(depth_map*.05), cv2.COLOR_GRAY2BGR)
         dmap_disp = self.draw_table_on_rbg(depth_map, contours)
-        FileUploader.save_image(dmap_disp, "table_detector_{}.png".format(self.image_index), folder="table_detection/")
+        FileUploader.upload_image(dmap_disp, "table_detector_{}.png".format(self.image_index))
         # cv2.imshow('detected shapes', cv2.resize(dmap_disp, (0, 0), fx=.5, fy=.5))
         # cv2.waitKey(1)
         if edges is not None:
-            FileUploader.save_image(edges, "table_detector_edges_{}.png".format(self.image_index), folder="table_detection/")
+            FileUploader.upload_image(edges, "table_detector_edges_{}.png".format(self.image_index))
             # cv2.imshow('edges', edges)
             # cv2.waitKey(1)
         self.image_index += 1

@@ -65,9 +65,6 @@ class FloorExtractor():
 
 
     def calculate_floor_normal(self, point_cloud, alg_conf, percentage = 0.2):
-        if len(point_cloud) == 0:
-            Log.e("Received an empty point cloud, the camera may be obstructed or not working correctly")
-            raise Exception("Received an empty point cloud, the camera may be obstructed or not working correctly")
 
         low_points, low_points_flat = self.calculate_low_points_flat(point_cloud=point_cloud, percentage=percentage)
         labels, unique_labels = self.perform_dbscan_filtering(alg_conf, low_points_flat)

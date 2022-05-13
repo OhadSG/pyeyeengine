@@ -74,7 +74,7 @@ cntr = 0
 # fig2.show()
 #end scatter plot
 
-print('here error3')
+print('here')
 
 flag = 0
 bkgr_update_cntr = -1

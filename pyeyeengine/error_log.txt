@@ -1,7 +1,7 @@
 Traceback (most recent call last):
   File "pyeyeengine/server/request_distributor.py", line 229, in pyeyeengine.server.request_distributor.RequestDistributor._try_serving
-  File "pyeyeengine/server/request_distributor.py", line 457, in pyeyeengine.server.request_distributor.RequestDistributor.reload_table_data
-  File "pyeyeengine/calibration/auto_calibrator.py", line 252, in pyeyeengine.calibration.auto_calibrator.AutoCalibrator.load_table_data
+  File "pyeyeengine/server/request_distributor.py", line 583, in pyeyeengine.server.request_distributor.RequestDistributor.get_table_mask
+  File "pyeyeengine/calibration/auto_calibrator.py", line 258, in pyeyeengine.calibration.auto_calibrator.AutoCalibrator.load_table_data
 pyeyeengine.calibration.auto_calibrator.CalibrationFailed: Error loading table data, please rerun calibration!
 
 The above exception was the direct cause of the following exception:
@@ -9,4 +9,4 @@ The above exception was the direct cause of the following exception:
 Traceback (most recent call last):
   File "pyeyeengine/server/request_distributor.py", line 195, in pyeyeengine.server.request_distributor.RequestDistributor.distribute
   File "pyeyeengine/server/request_distributor.py", line 231, in pyeyeengine.server.request_distributor.RequestDistributor._try_serving
-pyeyeengine.server.request_distributor.ClientServerException: Error in reload_table_data
+pyeyeengine.server.request_distributor.ClientServerException: Error in get_table_mask

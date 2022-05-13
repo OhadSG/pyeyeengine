@@ -3,7 +3,6 @@
 pip3_required_packages = {'cython':'any',
                           'numpy': '1.17.4',
                           'parse': 'any',
-                          'botocore':'any',
                           'boto3': 'any'}
 
 apt_required_packages = {'python3-scipy',
@@ -37,9 +36,8 @@ def prepare_download_script():
 
         if required_version != "any":
             packageName = packageName + "=={}".format(required_version)
-            outFile.write('pip3 install {}\n'.format(packageName))
-        else:
-            outFile.write('pip3 install -U {}\n'.format(packageName))
+
+        outFile.write('pip3 download {}\n'.format(packageName))
 
     outFile.write('cd ..\n')
     outFile.write('mkdir -p apt && cd ./apt/\n')

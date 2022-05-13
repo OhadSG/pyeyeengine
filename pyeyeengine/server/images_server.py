@@ -120,7 +120,7 @@ socketio = SocketIO(app)
 screen_setter = ScreenSetter(socketio)
 
 def start_thread():
-    server_thread = threading.Thread(name='ImagesServer', target=run_app, args=(), daemon=True)
+    server_thread = threading.Thread(target=run_app, args=(), daemon=True)
     server_thread.start()
 
 def reset_thread():

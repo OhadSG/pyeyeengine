@@ -1,12 +1,8 @@
 import threading
-import logging
+from pyeyeengine.utilities.logging import Log
 from contextlib import contextmanager
 import signal
 import time
-from pyeyeengine.utilities.logging import Log
-
-
-logger = logging.getLogger(__name__)
 
 # @contextmanager
 def timeout(time):
@@ -61,7 +57,7 @@ class ExecTimeChecker(threading.Thread):
         if self.stopped():
             return
 
-        Log.d("Stopping ExecTimeChecker: {}".format(self.name))
+        Log.w("Stopping ExecTimeChecker: {}".format(self.name))
 
         self._stop_event.set()
 
@@ -76,12 +72,10 @@ class ExecTimeChecker(threading.Thread):
 
     def call_error_callback(self):
         if self._message is not None:
-            logger.info("WatchDog Triggered " + "{}".format(self._message))
-            # Log.w("WatchDog Triggered", extra_details={"message": "{}".format(self._message)})
+            Log.w("WatchDog Triggered", extra_details={"message": "{}".format(self._message)})
 
         if self._error_callback is not None:
-            logger.info("WatchDog Callback Execution")
-            # Log.w("WatchDog Callback Execution")
+            Log.w("WatchDog Callback Execution")
             self._error_callback()
         else:
             ExecTimeChecker.report_hanging_function(self._name, self._caller)

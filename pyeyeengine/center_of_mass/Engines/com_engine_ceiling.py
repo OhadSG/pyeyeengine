@@ -1,4 +1,5 @@
 import copy
+import time
 import numpy as np
 
 from pyeyeengine.background.background import BackgroundFunction
@@ -9,9 +10,8 @@ from pyeyeengine.utilities.astra_orbbec_conf import AstraOrbbec
 from pyeyeengine.center_of_mass.floor_extractor import FloorExtractor
 from pyeyeengine.center_of_mass.jump_detector import JumpDetector
 import pyeyeengine.utilities.global_params as Globals
+from pyeyeengine.utilities.logging import Log
 from pyeyeengine.camera_utils.frame_manager import FrameManager
-from pyeyeengine.eye_engine.fps_counter import FPSCounter
-from pyeyeengine.eye_engine.change_detector import ChangeDetector
 
 #If an accelerometer is present, use an accelerometer, otherwise set usage to FALSE.
 try:
@@ -21,10 +21,9 @@ except:
     USE_ACCELEROMETER = False
 
 
-class COMEngine():
-    engine_type = Globals.EngineType.COM
-
+class COMEngine:
     def __init__(self):
+        self.engine_type = Globals.EngineType.COM
         self._camera_conf = AstraOrbbec(scale_factor = 2)
         if USE_ACCELEROMETER == True:
             self.x_angle = get_total_angle_obie(iterations=50)
@@ -32,12 +31,7 @@ class COMEngine():
             # self.x_angle = 67.5
             self.x_angle = 0
 
-        # TODO: REMOVE - DO NOT LEAVE AS IS!
-        self._fps_counter = FPSCounter()
-        self._background_model = ChangeDetector()
-        # END OF TODO
-
-        FrameManager.getInstance().set_depth_resolution(Globals.Resolution(self._camera_conf.y_res, self._camera_conf.x_res))
+        FrameManager.getInstance().set_depth_resolution(Globals.Resolution((self._camera_conf.y_res, self._camera_conf.x_res)))
         depth_image = FrameManager.getInstance().get_depth_frame()
         self.pcl = PointCloud(depth_image, x_rotation=self.x_angle, y_rotation=0, camera_conf=self._camera_conf)
         self.floor_extractor = FloorExtractor(self.pcl.point_cloud, alg_conf={'eps': 150, 'min_samples': 100}, percentage=0.2)
@@ -68,7 +62,7 @@ class COMEngine():
     def get_new_point_cloud(self):
         # Get depth image and calculate 3D-points in euclidean space from it
         FrameManager.getInstance().set_depth_resolution(
-            Globals.Resolution(self._camera_conf.y_res, self._camera_conf.x_res))
+            Globals.Resolution((self._camera_conf.y_res, self._camera_conf.x_res)))
         depth_image = FrameManager.getInstance().get_depth_frame()
         self.pcl.update_point_cloud(depth_image)
 
@@ -84,10 +78,10 @@ class COMEngine():
         #initialize background function
         self.bg_function.init_bg_removal_function(self.pcl.point_cloud)
 
-        #Finetune the background function based on several depth_image takes in order to come up for noise which can occur in a single frame.
+        #Finetune the background function based on several depth_image takes in order to come up for noise wbhich can occur in a single frame.
         for i in range(self.bg_finetune_iter_start):
             FrameManager.getInstance().set_depth_resolution(
-                Globals.Resolution(self._camera_conf.y_res, self._camera_conf.x_res))
+                Globals.Resolution((self._camera_conf.y_res, self._camera_conf.x_res)))
             depth_image = FrameManager.getInstance().get_depth_frame()
             self.pcl.update_point_cloud(depth_image)
             self.bg_function.finetune_bg_function_for_noise(self.pcl.point_cloud)

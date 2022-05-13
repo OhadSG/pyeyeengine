@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import os
 
 from pyeyeengine.object_detection.shape_detector import ShapeDetector
 
@@ -9,10 +8,8 @@ shapeDetector = ShapeDetector()
 
 def find_max_playing_mask(calibrator, is_display=False):
     mask_for_cam = calibrator.table_mask
-    if len(mask_for_cam.shape) == 3:
-        mask_for_cam = mask_for_cam[:, :, 0]
     # table_contour_cam = calibrator.table_contour
-    mask_for_display = cv2.warpPerspective(mask_for_cam, calibrator.warp_mat_cam_2_displayed,
+    mask_for_display = cv2.warpPerspective(mask_for_cam[:, :, 0], calibrator.warp_mat_cam_2_displayed,
                                            dsize=(calibrator.screen_width, calibrator.screen_height))
     # _, surface_contour_display, _ = cv2.findContours(mask_for_display, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
 
@@ -40,8 +37,7 @@ def find_max_playing_mask(calibrator, is_display=False):
     else:
         playing_mask = np.ones_like(mask_for_display) * 255
 
-    BASE_PATH = os.path.dirname(os.path.realpath(__file__))
-    cv2.imwrite(BASE_PATH + "/playing_mask.png", playing_mask)
+    cv2.imwrite("./playing_mask.png", playing_mask)
     if is_display:
         playing_mask = display(playing_mask, surface_contour_display)
     return playing_mask

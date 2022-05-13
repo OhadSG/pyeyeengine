@@ -64,7 +64,7 @@ def check_running():
     psaux_reponse1 = os.popen("ps aux | grep '[p]yeyeengine-server'").read()
     psaux_reponse2 = os.popen("ps aux | grep '[p]yeyeengine_server.py'").read()
 
-    print_status("Engine instances: \033[0;32m{}\033[0m".format(count_result))
+    print_status("Engine instances: \033[0;32m{}".format(count_result))
 
     not_running_message = "\033[0;31mNot Running\033[0m"
 
@@ -107,10 +107,8 @@ def run_engine(pip3=False, remote=False):
     now = str(datetime.now())
 
     print_status("Starting server...")
-    try:
-        os.system("rm /root/engine_run_log.txt")
-    except e:
-        pass
+
+    os.system("rm /root/engine_run_log.txt")
 
     if pip3:
         pip3_kickstart_script = "./server_kickstart_pip3.sh"
@@ -119,7 +117,7 @@ def run_engine(pip3=False, remote=False):
             print_status("Creating pip3 run script")
             with open("{}".format(pip3_kickstart_script), "w") as script:
                 script.write('echo "-> Engine Kickstart Script (PIP3 Installed)"\n')
-                script.write('nohup pyeyeengine-server >> /root/engine_run_log.txt 2>&1 &')
+                script.write('nohup pyeyeengine-server >> ~/engine_run_log.txt 2>&1 &')
                 script.close()
 
         os.system("chmod +x {} && {}".format(pip3_kickstart_script, pip3_kickstart_script))
@@ -130,7 +128,7 @@ def run_engine(pip3=False, remote=False):
             print_status("Creating remote run script")
             with open("{}".format(remote_kickstart_script), "w") as script:
                 script.write('echo "-> Engine Kickstart Script (Remote Installed)"\n')
-                script.write('nohup python3 -u /usr/local/lib/python3.5/dist-packages/pyeyeengine/server/pyeyeengine_server.py >> /root/engine_run_log.txt 2>&1 &')
+                script.write('nohup python3 -u /usr/local/lib/python3.5/dist-packages/pyeyeengine/server/pyeyeengine_server.py >> ~/engine_run_log.txt 2>&1 &')
                 script.close()
 
         os.system("chmod +x {} && {}".format(remote_kickstart_script, remote_kickstart_script))
@@ -140,21 +138,18 @@ def run_engine(pip3=False, remote=False):
         output_log.close()
 
 def print_status(msg):
-    report_to_admin(msg)
     print("\n\033[0;93m{}\033[0m\n".format(msg))
 
 def print_success(msg):
-    report_to_admin(msg)
     print("\033[0;32m{}\033[0m".format(msg))
 
 def print_fail(msg):
-    report_to_admin(msg)
     print("\033[0;31m{}\033[0m".format(msg))
 
 def prepare_admin_report():
     now = str(datetime.now())
 
-    with open("/etc/admin.txt", "w+") as report:
+    with open("/etc/admin_report.txt", "w+") as report:
         report.write("{} Engine Handler Results:\n".format(now))
         report.close()
 
@@ -243,8 +238,8 @@ def engine_handler(files_exist, pip3, remote):
     else:
         report_to_admin("Running engine...")
         run_engine(pip3, remote)
-        print_status("Will check engine again in 30 seconds...")
-        time.sleep(30)
+        print_status("Will check engine again in 10 seconds...")
+        time.sleep(10)
         engine_handler(files_exist, pip3, remote)
 
 

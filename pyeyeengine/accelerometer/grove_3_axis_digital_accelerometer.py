@@ -3,7 +3,7 @@ import time
 import numpy as np
 from matplotlib import pyplot as plt
 
-bus = smbus.SMBus(1)
+bus = smbus.SMBus(4)
 
 # ADXL345 device address
 ADXL345_DEVICE = 0x53
@@ -146,3 +146,4 @@ if __name__ == "__main__":
 
 
         time.sleep(2)
+

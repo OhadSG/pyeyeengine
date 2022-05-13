@@ -11,12 +11,6 @@ class Resolution():
     def string(self):
         return "{}x{}".format(self.width, self.height)
 
-    def __str__(self):
-        return self.string()
-
-    def __eq__(self, other):
-        return self.is_equal(other)
-
     def is_equal(self, to_resolution):
         return (self.width == to_resolution.width and self.height == to_resolution.height)
 
@@ -60,12 +54,3 @@ class EngineType(Enum):
      COM = 1
      LightTouch = 2
      EyeEngine = 3
-     DynamicSurface = 4
-
-class Commons(Enum):
-     decrease = 0
-     increase = 1
-
-class EngineException(Exception):
-    def __init__(self, message=""):
-        super().__init__(message)

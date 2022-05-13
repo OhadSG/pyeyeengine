@@ -1,53 +1,27 @@
+import os
 import sys
-import logging
+import traceback
 
-from pyeyeengine.utilities.rtc_tools import validate_system_time
-from pyeyeengine.server.HTTP_Server_Engine import HTTPEngineServer
 from pyeyeengine.server.engine_server import EngineServer
+from pyeyeengine.utilities.logging import Log
 from pyeyeengine.engine_installation import dependencies_manager as DM
-from pyeyeengine.utilities.preferences import EnginePreferences
-from pyeyeengine.server.request_distributor import RequestDistributor
-from pyeyeengine.utilities.resource_usage_metrics_reporter import ResourceUsageMetricsReporter
-from pyeyeengine.utilities.logging import init_logging
-from pyeyeengine.utilities.metrics import init_metrics
-
-from pyeyeengine.utilities.session_manager import *
-
-logger = logging.getLogger(__name__)
+from pyeyeengine.camera_utils.frame_manager import FrameManager
 
 FILE_PATH = os.path.dirname(os.path.realpath(__file__))
 PATH_TO_CONSOLE_LOG = FILE_PATH + "/../console.txt"
 QA_CHECK_FILE_PATH = FILE_PATH + "/../utilities/Scripts/general_scripts/qa_check.py"
 
 def main():
-    init_metrics()
-    init_logging()
-    create_session()
-
-    if os.getenv('PYEYE_DEPENDENCY_CHECK_ENABLED', default='true') == 'true':
-        is_installed, missing_packages, description = DM.check_dependencies()
-    else:
-        is_installed, missing_packages, description = (True, [], '')
-
-    resource_usage_metrics_reporter = ResourceUsageMetricsReporter()
-    resource_usage_metrics_reporter.start()
-
-    validate_system_time(should_fix=True)
+    is_installed, missing_packages, description = DM.check_dependencies()
 
     if is_installed == True:
-        logger.info("Engine dependencies satisfied")
+        Log.d("Engine dependencies satisfied")
         if os.path.exists(QA_CHECK_FILE_PATH):
             os.system("cp {} ~/".format(QA_CHECK_FILE_PATH))
-        logger.info(
-            "Engine Preferences",
-            extra=EnginePreferences.getInstance().preferences
-        )
+        EngineServer().start()
     else:
+        Log.e("Missing required engine dependencies", extra_details=missing_packages)
         raise DM.DependencyException("Missing required engine dependencies - {}".format(description))
-
-    request_distributor = RequestDistributor()
-    HTTPEngineServer(request_distributor).start()
-    EngineServer(request_distributor).start()
 
 
 def remove_old_console_logs():
@@ -69,8 +43,12 @@ def close_console_log():
     f.close()
 
 if __name__ == '__main__':
+    # remove_old_console_logs()
+    # start_console_log()
+
     try:
         main()
-    except:
-        logger.exception("Engine Terminated")
-        exit(1)
+    except Exception as e:
+        Log.e("Engine Terminated", extra_details={"exception": "{}".format(e), "stacktrace":traceback.format_exc()})
+
+    # close_console_log()

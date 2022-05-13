@@ -7,14 +7,14 @@ class FPSCounter:
         self.fps = 0
         self.check_every_n_frames = int(check_every_n_frames)
         assert(self.check_every_n_frames >= 1)
-        self.start_time = time.monotonic()
+        self.start_time = time.clock()
 
     def process_frame(self):
         self.frame_count += 1
         if self.frame_count % self.check_every_n_frames == 0:
-            if self.frame_count == 0:
-                self.start_time = time.monotonic()
+            if self.frame_count == 0 :
+                self.start_time = time.clock()
             else:
-                end_time = time.monotonic()
+                end_time = time.clock()
                 self.fps = self.check_every_n_frames/np.maximum((end_time - self.start_time), 0.00001)
                 self.start_time = end_time

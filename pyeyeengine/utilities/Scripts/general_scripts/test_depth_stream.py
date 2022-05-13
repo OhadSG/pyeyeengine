@@ -11,3 +11,4 @@ if __name__ == '__main__':
     FrameManager.getInstance().start()
     FrameManager.set_depth_resolution(Globals.DEPTH_HIGH_QUALITY)
     depth = FrameManager.getInstance().get_depth_frame()
+    FileUploader.upload_image(depth, "frame_manager_frame.png")

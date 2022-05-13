@@ -2,7 +2,6 @@ import time
 # import matplotlib.pyplot as plt
 import cv2
 import numpy as np
-import logging
 
 from pyeyeengine.calibration.auto_calibrator import AutoCalibrator
 from pyeyeengine.eye_engine.change_detector import ChangeDetector
@@ -13,33 +12,20 @@ from pyeyeengine.eye_engine.fps_counter import FPSCounter
 from pyeyeengine.tracking.tracker import Tracker, TrackedObject
 import pyeyeengine.utilities.global_params as Globals
 from pyeyeengine.camera_utils.frame_manager import FrameManager
-from .engine_base import EngineBase
 
-logger = logging.getLogger(__name__)
-
-class EyeEngine(EngineBase):
-    engine_type = Globals.EngineType.EyeEngine
-
-    def __init__(self,
-        frame_manager: FrameManager,
-        background_model=ChangeDetector(),
-        object_detector=HandDetector(),
-        key_pts_extractor=PointingFingerExtractor(),
-        tracker=Tracker(),
-        calibrator=None,
-        fps_counter=FPSCounter(),
-        key_pts_limiter=KeyPointsLimiter(screen_width=1280, screen_height=800)
-    ):
-        super().__init__()
-
+class EyeEngine:
+    def __init__(self, background_model=ChangeDetector(),
+                 object_detector=HandDetector(), key_pts_extractor=PointingFingerExtractor(),
+                 tracker=Tracker(), calibrator=None, fps_counter=FPSCounter(),
+                 key_pts_limiter=KeyPointsLimiter(screen_width=1280, screen_height=800)):
         # If you use CameraReader as default parameter then it is being
         # created when the module is imported, thus initializing the camera before we meant to use it
-        self.frame_manager = frame_manager
+        self.engine_type = Globals.EngineType.EyeEngine
         self._background_model = background_model
         self._object_detector = object_detector
         self._key_pts_extractor = key_pts_extractor
         self._tracker = tracker
-        self._calibrator = calibrator if calibrator is not None else AutoCalibrator(self.frame_manager, (640, 480),
+        self._calibrator = calibrator if calibrator is not None else AutoCalibrator((640, 480),
                                                                                     camera=None)
         if hasattr(self._key_pts_extractor, 'max_height_above_playing_surface'):
             self._object_detector.set_max_height(self._key_pts_extractor.max_height_above_playing_surface)
@@ -55,13 +41,10 @@ class EyeEngine(EngineBase):
 
     def process_frame(self, display=False, show_time=False, debug=False):
         if show_time:
-            start_time = time.monotonic()
+            start_time = time.clock()
 
-        depth_stream = self.frame_manager.depth_stream
-
-        depth_stream.set_resolution(Globals.DEFAULT_CAMERA_RESOLUTION)
-        # depth_map = cv2.resize(depth_stream.get_frame(), (320, 240))
-        depth_map = depth_stream.get_frame()
+        FrameManager.getInstance().set_depth_resolution(Globals.DEFAULT_CAMERA_RESOLUTION)
+        depth_map = cv2.resize(FrameManager.getInstance().get_depth_frame(), (320, 240))
         self._background_model.update_background_model(depth_map, self._object_detector.get_binary_objects(),
                                                        self._calibrator.table_mask)
         diff_map = self._background_model.detect_change(depth_map)
@@ -79,12 +62,8 @@ class EyeEngine(EngineBase):
 
         self._fps_counter.process_frame()
 
-        logger.debug('Process frame', extra={
-            'fps': self._fps_counter.fps
-        })
-
         if show_time:
-            end_time = time.monotonic()
+            end_time = time.clock()
             print("engine run time (ms): %f" % ((end_time - start_time) * 1000))
 
         if display:
