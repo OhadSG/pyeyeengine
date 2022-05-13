@@ -1,2 +1,0 @@
-gvveldao39 04/04/2022 15:19:07 Validating system time
-gvveldao39 04/04/2022 15:19:07 RTC not installed, using legacy method

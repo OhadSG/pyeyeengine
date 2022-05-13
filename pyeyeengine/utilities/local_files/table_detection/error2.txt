@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "pyeyeengine/calibration/auto_calibrator.py", line 206, in pyeyeengine.calibration.auto_calibrator.AutoCalibrator.try_to_find_table
-  File "pyeyeengine/calibration/depth_to_rgb_transformation.py", line 121, in pyeyeengine.calibration.depth_to_rgb_transformation.find_transformation_from_depth_to_rgb
-Exception: Could not find match between rgb and depth
