@@ -1,0 +1,29 @@
+import numpy as np
+import cv2
+from camera_utils.camera_reader import CameraReader
+from eye_engine.eye_engine import EyeEngine
+import time
+
+# create engine
+cam = CameraReader()
+engine = EyeEngine()
+keep_running = True
+is_calibrated = False
+while keep_running:
+    key = cv2.waitKey(1)
+    if key == 27:
+        keep_running = False
+    start_time = time.clock()
+    depth_map = cam.get_depth()
+    rgb = cam.get_rgb()
+      
+
+    engine.process_frame(depth_map, rgb)
+    print(time.clock()-start_time)  
+    #cv2.imshow('depth', np.uint8(depth_map*.05))
+    #cv2.imshow('rbg', rgb)
+
+## Release resources
+cv2.destroyAllWindows()
+cam.stop()
+

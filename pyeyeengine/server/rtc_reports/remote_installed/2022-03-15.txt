@@ -1,0 +1,24 @@
+o5vcfphgz3 15/03/2022 15:06:33 RTC not installed, using legacy method
+o5vcfphgz3 15/03/2022 15:06:33 Validating system time
+bgba7veo13 15/03/2022 15:07:12 Validating system time
+bgba7veo13 15/03/2022 15:07:12 RTC not installed, using legacy method
+drt4bsx0la 15/03/2022 15:08:22 RTC not installed, using legacy method
+drt4bsx0la 15/03/2022 15:08:22 Validating system time
+spnxxt5o3h 15/03/2022 15:08:50 Validating system time
+spnxxt5o3h 15/03/2022 15:08:50 RTC not installed, using legacy method
+7jz4jisc8h 15/03/2022 15:09:50 RTC not installed, using legacy method
+7jz4jisc8h 15/03/2022 15:09:50 Validating system time
+ntfg9xpl16 15/03/2022 15:18:01 RTC not installed, using legacy method
+ntfg9xpl16 15/03/2022 15:18:01 Validating system time
+bj9ova8y5j 15/03/2022 15:18:56 RTC not installed, using legacy method
+bj9ova8y5j 15/03/2022 15:18:56 Validating system time
+in9szmo13p 15/03/2022 15:32:12 RTC not installed, using legacy method
+in9szmo13p 15/03/2022 15:32:12 Validating system time
+awe7arweh0 15/03/2022 15:47:34 RTC not installed, using legacy method
+awe7arweh0 15/03/2022 15:47:34 Validating system time
+teuuinglid 15/03/2022 15:52:59 Validating system time
+teuuinglid 15/03/2022 15:52:59 RTC not installed, using legacy method
+uzgk1wo6d3 15/03/2022 15:53:24 RTC not installed, using legacy method
+uzgk1wo6d3 15/03/2022 15:53:24 Validating system time
+wfcjsxqffx 15/03/2022 15:59:30 Validating system time
+wfcjsxqffx 15/03/2022 15:59:30 RTC not installed, using legacy method
